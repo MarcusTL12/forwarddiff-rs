@@ -1,7 +1,7 @@
 pub mod dual;
 
 use dual::Dual;
-pub use num_traits::real::Real;
+pub use num_traits::{real::Real, NumCast};
 
 pub fn diff<T: Real, F: Fn(Dual<T>) -> Dual<T>>(f: F, x: T) -> T {
     let x = Dual { r: x, d: T::one() };
@@ -75,5 +75,22 @@ mod tests {
         let d8f = make_diff_fn(&d7f);
         let d9f = make_diff_fn(&d8f);
         println!("{}", d9f(0.0));
+    }
+
+    #[test]
+    fn diff_fancy() {
+        fn f<T: Real>(x: T) -> T {
+            // sin(e^(x * cos(x / 3)) * ln(cos(x) + 1.5))
+            ((x * (x / <T as NumCast>::from(3).unwrap()).cos()).exp()
+                * (x.cos() + <T as NumCast>::from(1.5).unwrap()).ln())
+            .sin()
+        }
+
+        let d1f = make_diff_fn(&f);
+        let d2f = make_diff_fn(&d1f);
+        let d3f = make_diff_fn(&d2f);
+        let d4f = make_diff_fn(&d3f);
+
+        println!("{}", d4f(4.0));
     }
 }

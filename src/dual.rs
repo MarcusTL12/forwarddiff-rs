@@ -120,76 +120,97 @@ impl<T: Real> Num for Dual<T> {
 
 impl<T: Real> Real for Dual<T> {
     fn min_value() -> Self {
-        todo!()
+        Self::new(T::min_value())
     }
     fn min_positive_value() -> Self {
-        todo!()
+        Self::new(T::min_positive_value())
     }
     fn epsilon() -> Self {
-        todo!()
+        Self::new(T::epsilon())
     }
     fn max_value() -> Self {
-        todo!()
+        Self::new(T::max_value())
     }
     fn floor(self) -> Self {
-        todo!()
+        unimplemented!()
     }
     fn ceil(self) -> Self {
-        todo!()
+        unimplemented!()
     }
     fn round(self) -> Self {
-        todo!()
+        unimplemented!()
     }
     fn trunc(self) -> Self {
-        todo!()
+        unimplemented!()
     }
     fn fract(self) -> Self {
-        todo!()
+        unimplemented!()
     }
     fn abs(self) -> Self {
-        todo!()
+        self * self.signum()
     }
     fn signum(self) -> Self {
-        todo!()
+        use std::cmp::Ordering;
+        match self.partial_cmp(&Self::zero()) {
+            None => Self::zero(),
+            Some(Ordering::Equal) => Self::zero(),
+            Some(Ordering::Greater) => Self::one(),
+            Some(Ordering::Less) => -Self::one(),
+        }
     }
     fn is_sign_positive(self) -> bool {
-        todo!()
+        self.signum() > Self::zero()
     }
     fn is_sign_negative(self) -> bool {
-        todo!()
+        self.signum() < Self::zero()
     }
-    fn mul_add(self, _: Self, _: Self) -> Self {
-        todo!()
+    fn mul_add(self, x: Self, b: Self) -> Self {
+        self * x + b
     }
     fn recip(self) -> Self {
-        todo!()
+        Self::one() / self
     }
-    fn powi(self, _: i32) -> Self {
-        todo!()
+    fn powi(mut self, e: i32) -> Self {
+        if e < 0 {
+            self.recip().powi(-e)
+        } else {
+            let mut acc = Self::one();
+            while e > 0 {
+                if e & 1 == 1 {
+                    acc = acc * self;
+                }
+                self = self * self;
+            }
+            acc
+        }
     }
-    fn powf(self, _: Self) -> Self {
-        todo!()
+    fn powf(self, e: Self) -> Self {
+        (e * self.ln()).exp()
     }
     fn sqrt(self) -> Self {
-        todo!()
+        self.powf(<Self as NumCast>::from(0.5).unwrap())
     }
     fn exp(self) -> Self {
-        todo!()
+        let r = self.r.exp();
+        Self { r, d: r * self.d }
     }
     fn exp2(self) -> Self {
-        todo!()
+        <Self as NumCast>::from(2).unwrap().powf(self)
     }
     fn ln(self) -> Self {
-        todo!()
+        Self {
+            r: self.r.ln(),
+            d: self.d / self.r,
+        }
     }
-    fn log(self, _: Self) -> Self {
-        todo!()
+    fn log(self, b: Self) -> Self {
+        self.ln() / b.ln()
     }
     fn log2(self) -> Self {
-        todo!()
+        self.log(<Self as NumCast>::from(2).unwrap())
     }
     fn log10(self) -> Self {
-        todo!()
+        self.log(<Self as NumCast>::from(10).unwrap())
     }
     fn to_degrees(self) -> Self {
         todo!()
@@ -197,29 +218,40 @@ impl<T: Real> Real for Dual<T> {
     fn to_radians(self) -> Self {
         todo!()
     }
-    fn max(self, _: Self) -> Self {
-        todo!()
+    fn max(self, other: Self) -> Self {
+        if self < other {
+            other
+        } else {
+            self
+        }
     }
-    fn min(self, _: Self) -> Self {
-        todo!()
+    fn min(self, other: Self) -> Self {
+        if self > other {
+            other
+        } else {
+            self
+        }
     }
-    fn abs_sub(self, _: Self) -> Self {
-        todo!()
+    fn abs_sub(self, rhs: Self) -> Self {
+        (self - rhs).abs()
     }
     fn cbrt(self) -> Self {
-        todo!()
+        self.powf(<Self as NumCast>::from(1.0 / 3.0).unwrap())
     }
-    fn hypot(self, _: Self) -> Self {
-        todo!()
+    fn hypot(self, b: Self) -> Self {
+        (self * self + b * b).sqrt()
     }
     fn sin(self) -> Self {
-        todo!()
+        let (r, d) = self.r.sin_cos();
+        Self { r, d: self.d * d }
     }
     fn cos(self) -> Self {
-        todo!()
+        let (d, r) = self.r.sin_cos();
+        Self { r, d: -self.d * d }
     }
     fn tan(self) -> Self {
-        todo!()
+        let (s, c) = self.sin_cos();
+        s / c
     }
     fn asin(self) -> Self {
         todo!()
@@ -234,7 +266,17 @@ impl<T: Real> Real for Dual<T> {
         todo!()
     }
     fn sin_cos(self) -> (Self, Self) {
-        todo!()
+        let (s, c) = self.r.sin_cos();
+        (
+            Self {
+                r: s,
+                d: self.d * c,
+            },
+            Self {
+                r: c,
+                d: -self.d * s,
+            },
+        )
     }
     fn exp_m1(self) -> Self {
         todo!()
