@@ -1,7 +1,7 @@
 pub mod dual;
 
 use dual::Dual;
-pub use num_traits::{real::Real, NumCast};
+pub use num_traits::{real::Real, Zero};
 
 pub fn diff<T: Real, F: Fn(Dual<T>) -> Dual<T>>(f: F, x: T) -> T {
     let x = Dual { r: x, d: T::one() };
@@ -15,6 +15,49 @@ pub fn make_diff_fn<T: Real, F: Fn(Dual<T>) -> Dual<T>>(
     f: &F,
 ) -> impl Fn(T) -> T + '_ {
     move |x| diff(f, x)
+}
+
+pub fn grad<const N: usize, T: Real, F: Fn(&[Dual<T>; N]) -> Dual<T>>(
+    f: F,
+    x: &[T; N],
+    g: &mut [T; N],
+    buf: &mut [Dual<T>; N],
+) {
+    for (b, &x) in buf.iter_mut().zip(x.iter()) {
+        *b = Dual::new(x);
+    }
+
+    for i in 0..N {
+        buf[i].d = T::one();
+
+        let fx = f(buf);
+
+        g[i] = fx.d;
+
+        buf[i].d = T::zero();
+    }
+}
+
+pub fn grad_static<const N: usize, T: Real, F: Fn(&[Dual<T>; N]) -> Dual<T>>(
+    f: F,
+    x: &[T; N],
+) -> [T; N] {
+    let mut g = [T::zero(); N];
+    let mut buf = [Dual::zero(); N];
+
+    grad(&f, x, &mut g, &mut buf);
+
+    g
+}
+
+pub fn make_grad_fn<
+    const N: usize,
+    T: Real,
+    F: Fn(&[Dual<T>; N]) -> Dual<T>,
+>(
+    f: &F,
+) -> impl Fn(&[T; N]) -> [T; N] + '_ {
+    move |x| grad_static(f, x)
 }
 
 #[cfg(test)]
@@ -81,8 +124,8 @@ mod tests {
     fn diff_fancy() {
         fn f<T: Real>(x: T) -> T {
             // sin(e^(x * cos(x / 3)) * ln(cos(x) + 1.5))
-            ((x * (x / <T as NumCast>::from(3).unwrap()).cos()).exp()
-                * (x.cos() + <T as NumCast>::from(1.5).unwrap()).ln())
+            ((x * (x / T::from(3).unwrap()).cos()).exp()
+                * (x.cos() + T::from(1.5).unwrap()).ln())
             .sin()
         }
 
@@ -92,5 +135,44 @@ mod tests {
         let d4f = make_diff_fn(&d3f);
 
         println!("{}", d4f(4.0));
+    }
+
+    #[test]
+    fn grad1() {
+        fn f<T: Real>([x, y]: &[T; 2]) -> T {
+            *x * (*x * *y).exp()
+        }
+
+        let x = [1.0, 1.0];
+        let mut g = [0.0; 2];
+        let mut buf = [Dual::zero(); 2];
+
+        grad(f, &x, &mut g, &mut buf);
+
+        println!("{:?}", g);
+    }
+
+    #[test]
+    fn grad1_static() {
+        fn f<T: Real>([x, y]: &[T; 2]) -> T {
+            *x * (*x * *y).exp()
+        }
+        let x = [1.0, 1.0];
+
+        let g = grad_static(f, &x);
+
+        println!("{:?}", g);
+    }
+
+    #[test]
+    fn grad1_fn() {
+        fn f<T: Real>([x, y]: &[T; 2]) -> T {
+            *x * (*x * *y).exp()
+        }
+
+        let df = make_grad_fn(&f);
+
+        let g = df(&[1.0, 1.0]);
+        println!("{:?}", g);
     }
 }
