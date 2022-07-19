@@ -170,7 +170,7 @@ impl<T: Real> Real for Dual<T> {
     fn recip(self) -> Self {
         Self::one() / self
     }
-    fn powi(mut self, e: i32) -> Self {
+    fn powi(mut self, mut e: i32) -> Self {
         if e < 0 {
             self.recip().powi(-e)
         } else {
@@ -180,6 +180,7 @@ impl<T: Real> Real for Dual<T> {
                     acc = acc * self;
                 }
                 self = self * self;
+				e /= 2;
             }
             acc
         }
