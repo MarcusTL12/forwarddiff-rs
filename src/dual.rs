@@ -180,7 +180,7 @@ impl<T: Real> Real for Dual<T> {
                     acc = acc * self;
                 }
                 self = self * self;
-				e /= 2;
+                e /= 2;
             }
             acc
         }
