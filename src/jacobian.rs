@@ -37,7 +37,17 @@ pub fn jacobian<T: Real, F: FnMut(&[Dual<T>], &mut [Dual<T>])>(
     jac
 }
 
-//pub fn make_jacobian_fn<T: Real, F: FnMut(&[Dual<T>], &mut [Dual<T>])>
+pub fn make_jacobian_fn<
+    'a,
+    T: Real,
+    F: FnMut(&[Dual<T>], &mut [Dual<T>]) + 'a,
+>(
+    mut f: F,
+    buf_in: &'a mut [Dual<T>],
+    buf_out: &'a mut [Dual<T>],
+) -> impl FnMut(&[T], Option<Array2<T>>) -> Array2<T> + 'a {
+    move |x, j| jacobian(&mut f, x, buf_in, buf_out, j)
+}
 
 pub fn hessian<T: Real, F: Fn(&[Dual<Dual<T>>]) -> Dual<Dual<T>>>(
     f: F,
@@ -50,6 +60,19 @@ pub fn hessian<T: Real, F: Fn(&[Dual<Dual<T>>]) -> Dual<Dual<T>>>(
     let g_fn = make_grad_fn(&f, buf_grad);
 
     jacobian(g_fn, x, buf_in, buf_out, hess)
+}
+
+pub fn make_hessian_fn<
+    'a,
+    T: Real,
+    F: Fn(&[Dual<Dual<T>>]) -> Dual<Dual<T>>,
+>(
+    f: &'a F,
+    buf_grad: &'a mut [Dual<Dual<T>>],
+    buf_in: &'a mut [Dual<T>],
+    buf_out: &'a mut [Dual<T>],
+) -> impl FnMut(&[T], Option<Array2<T>>) -> Array2<T> + 'a {
+    move |x, h| hessian(f, x, buf_grad, buf_in, buf_out, h)
 }
 
 #[cfg(test)]
@@ -73,6 +96,18 @@ mod tests {
         println!("{j:6.3?}");
     }
 
+    #[test]
+    fn jacobian1_fn() {
+        let x = [1.0, 2.0];
+        let mut buf_in = [Dual::zero(); 2];
+        let mut buf_out = buf_in;
+        let mut jf = make_jacobian_fn(f1, &mut buf_in, &mut buf_out);
+
+        let j = jf(&x, None);
+
+        println!("{j:6.3?}");
+    }
+
     fn gf<T: Real>(x: &[T]) -> T {
         x[0] * (x[0] * x[1]).exp()
     }
@@ -85,6 +120,19 @@ mod tests {
         let mut buf_out = [Dual::zero(); 2];
 
         let h = hessian(gf, &x, &mut buf_grad, &mut buf_in, &mut buf_out, None);
+        println!("{h:8.4?}");
+    }
+
+    #[test]
+    fn hessian1_fn() {
+        let x = [1.0, 2.0];
+        let mut buf_grad = [Dual::zero(); 2];
+        let mut buf_in = [Dual::zero(); 2];
+        let mut buf_out = [Dual::zero(); 2];
+        let mut hf =
+            make_hessian_fn(&gf, &mut buf_grad, &mut buf_in, &mut buf_out);
+
+        let h = hf(&x, None);
         println!("{h:8.4?}");
     }
 }
